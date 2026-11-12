@@ -1,0 +1,28 @@
+rules:
+  - id: myapp-admin-client-outside-admin
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      supabaseAdmin uses the service role key, which skips Row Level Security. In this project
+      only code under app/api/admin/ may use it; everything else should use the per-user client
+      so RLS keeps each user to their own rows.
+    paths:
+      exclude:
+        - "app/api/admin/**"
+        - "lib/supabase-admin.ts"
+    metadata:
+      title: Admin database client used outside admin code
+      level: high
+      cwe: "CWE-269: Improper Privilege Management"
+      confirm: >-
+        Check what the code does with the client. If it reads or writes data for the logged-in
+        user, it should be using the user's client instead.
+      impact: >-
+        High: user-facing code reads or writes with RLS bypassed. False positive: a deliberate
+        server-only job; document it with an ignore entry.
+      fix: >-
+        Import the per-user client (e.g. createServerClient from @supabase/ssr) here, or move the
+        code under app/api/admin/.
+    pattern-either:
+      - pattern: import { ..., supabaseAdmin, ... } from "$MODULE"
+      - pattern: import { ..., supabaseAdmin as $ALIAS, ... } from "$MODULE"

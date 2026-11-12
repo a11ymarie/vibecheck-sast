@@ -28,7 +28,7 @@ NOT_SECRET_WORDS = re.compile(
 
 SKIP_DIRS = {"node_modules", ".git", ".next", ".nuxt", ".output", ".vercel", ".turbo",
              ".svelte-kit", ".expo", "build", "dist", "out", "coverage", "ios", "android",
-             "vendor", "vibecheck-report"}
+             "vendor", "vibecheck-report", ".vibecheck"}
 SKIP_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg", ".pdf", ".zip",
                  ".gz", ".woff", ".woff2", ".ttf", ".otf", ".mp3", ".mp4", ".mov", ".map",
                  ".lock", ".lockb", "package-lock.json", ".min.js")
@@ -150,7 +150,7 @@ def _files(app: str):
                 pass
 
 
-def scan(app: str) -> list[Finding]:
+def scan(app: str, extra: list[Detector] | None = None) -> list[Finding]:
     files = list(_files(app))
     ignored = _git_ignored(app, [rel for _, rel in files])
     found = []
@@ -165,7 +165,7 @@ def scan(app: str) -> list[Finding]:
         for n, line in enumerate(lines, 1):
             if len(line) > 3000:
                 continue
-            for d in DETECTORS:
+            for d in [*(extra or []), *DETECTORS]:
                 m = d.pattern.search(line)
                 if not m:
                     continue

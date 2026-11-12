@@ -103,6 +103,16 @@ export async function GET(req: Request) {
   return NextResponse.redirect(next!) ?? page ?? fixed
 }
 
+// Destructured searchParams, the other common Next.js style.
+export async function POST(req: Request) {
+  const {searchParams} = new URL(req.url)
+  const dest = searchParams.get('dest')
+  // ruleid: vc-server-fetches-user-url
+  const res = await fetch(dest!)
+  // ok: vc-open-redirect
+  return NextResponse.redirect(new URL('/login', req.url)) ?? res
+}
+
 // ---- vc-open-redirect ----
 app.get('/login/done', (req, res) => {
   // ruleid: vc-open-redirect

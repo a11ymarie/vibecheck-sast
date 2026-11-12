@@ -5,6 +5,7 @@
   vibecheck --compare last <app>         show what's fixed, still open or new since the last scan
   vibecheck --fail-on high <app>         exit 1 if anything high or critical is found
   vibecheck init <app>                   set it up in a project (asks before each change)
+  vibecheck test-rules <rules> <tests>   test your own rules (see docs/customizing.md)
 
 Exit codes: 0 done (and passed --fail-on), 1 --fail-on threshold hit, 2 the scan failed.
 """
@@ -18,7 +19,7 @@ import sys
 from datetime import datetime
 
 from . import compare as comparing
-from . import configcheck, deps, ignores, report, secrets, semgrep, tasks
+from . import configcheck, deps, ignores, project, report, secrets, semgrep, tasks
 from .model import LEVELS, RANK, assign_ids, merge_same_line, sort_key
 
 VERSION = "1.0.0"
@@ -73,6 +74,9 @@ def step(label, fn):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["test-rules"]:
+        from . import ruletest
+        return ruletest.main(argv[1:])
     if argv[:1] == ["init"]:
         init = os.path.join(os.path.dirname(os.path.abspath(__file__)), "init.py")
         os.execv(sys.executable, [sys.executable, init, ROOT, *argv[1:]])
@@ -86,6 +90,13 @@ def main(argv=None):
     if a.config and not os.path.exists(a.config):
         fail(f"no such config file: {a.config}")
 
+    try:
+        proj = project.load(cfg)
+    except project.ConfigError as e:
+        fail(str(e))
+    rules = proj.ignores
+    community = not a.quick and proj.community
+
     now = datetime.now()
     out = os.path.abspath(a.out or os.path.join(REPORTS, f"{name}-{now:%Y%m%d-%H%M%S}"))
     if os.path.isdir(out) and os.listdir(out) and not os.path.exists(os.path.join(out, "findings.json")):
@@ -96,7 +107,9 @@ def main(argv=None):
     raw = os.path.join(out, "raw")
     os.makedirs(raw, exist_ok=True)
 
-    prev_path, notes = None, []
+    prev_path, notes = None, list(proj.notes)
+    if not a.quick and not proj.community:
+        notes.append("Community rules are turned off in .vibecheck.yml (`community: false`).")
     if a.compare == "last":
         prev_path = previous_report(name, out)
         if not prev_path:
@@ -106,21 +119,18 @@ def main(argv=None):
         if not os.path.exists(prev_path):
             fail(f"no such file to compare with: {a.compare}")
 
-    try:
-        rules, ignore_notes = ignores.load(cfg)
-    except ignores.ConfigError as e:
-        fail(str(e))
-    notes += ignore_notes
 
     print(f"vibecheck: scanning {app}" + (" (quick)" if a.quick else ""))
     found = []
     try:
-        if not a.quick and not semgrep.community_ready():
+        if community and not semgrep.community_ready():
             semgrep.fetch_community(log=lambda m: print("  " + m))
-        sg, sg_notes = step("Code rules", lambda: semgrep.run(app, raw, community=not a.quick))
+        label = "Code rules" + (f" (+{len(proj.rule_paths)} project)" if proj.rule_paths else "")
+        sg, sg_notes = step(label, lambda: semgrep.run(app, raw, community=community,
+                                                        project_rules=proj.rule_paths))
         found += sg
         notes += sg_notes
-        found += step("Secrets", lambda: secrets.scan(app))
+        found += step("Secrets", lambda: secrets.scan(app, proj.secret_detectors))
         found += step("Configuration", lambda: configcheck.scan(app))
         if not a.quick:
             dep, dep_notes = step("Dependencies", lambda: deps.scan(app, raw))
@@ -129,7 +139,12 @@ def main(argv=None):
     except semgrep.ScanError as e:
         fail(f"{e}\nThe scan didn't finish, so no report was written.")
 
-    sources = ["custom", "secrets", "config"] + ([] if a.quick else ["community", "deps"])
+    sources = ["custom", "secrets", "config"] + (["community"] if community else []) + \
+              ([] if a.quick else ["deps"])
+    for f in found:
+        if f.rule in proj.severity:
+            f.extra = dict(f.extra, severity_was=f.severity)
+            f.severity = proj.severity[f.rule]
     assign_ids(found)
     kept, ignored = ignores.apply(found, rules)
     unused = [r["name"] for r in rules if r["hits"] == 0]

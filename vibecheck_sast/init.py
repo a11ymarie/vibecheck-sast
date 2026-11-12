@@ -6,7 +6,8 @@ Usage: vibecheck init [--yes | --all | --dry-run] [--only a,b,...] <path-to-app>
   --yes      accept the suggested answer for every step (shown as [Y/n] or [y/N])
   --all      say yes to every step
   --dry-run  show what would change, change nothing
-  --only     limit to some steps: gitignore, config, claude, agents, cursor, scripts, hook, action
+  --only     limit to some steps: gitignore, config, rules, claude, agents, cursor, scripts, hook,
+             action
 
 Every step only adds: existing files are never overwritten. Sections it adds to CLAUDE.md and
 AGENTS.md sit between vibecheck markers, so running init again updates them in place.
@@ -16,7 +17,7 @@ import json, os, re, stat, subprocess, sys
 SCANNER = os.path.abspath(sys.argv[1])
 INTEGRATIONS = os.path.join(SCANNER, "integrations")
 START, END = "<!-- vibecheck:start -->", "<!-- vibecheck:end -->"
-STEPS = ["gitignore", "config", "claude", "agents", "cursor", "scripts", "hook", "action"]
+STEPS = ["gitignore", "config", "rules", "claude", "agents", "cursor", "scripts", "hook", "action"]
 
 args = sys.argv[2:]
 mode, only, app = "ask", None, None
@@ -168,10 +169,20 @@ if missing and ask("gitignore", f".gitignore: add {', '.join(missing)}?", True):
 if not os.path.exists(p(".vibecheck.yml")) and \
         ask("config", "Create .vibecheck.yml (an empty, commented ignore file)?", True):
     write(p(".vibecheck.yml"), """\
-# vibecheck ignore file. Every entry needs a reason; ignored findings are still listed at the end
-# of the report. Each finding shows its rule, e.g. "rule `vc-secret-in-url`".
+# vibecheck settings for this project. Every key is optional; see docs/customizing.md in
+# vibecheck-sast for the full guide.
 #
-# ignore_paths:
+# rules:                         # your own Semgrep rules (files or folders, relative to this file)
+#   - .vibecheck/rules/
+#
+# secrets:                       # your own secret formats (regular expressions)
+#   - id: myapp-service-token
+#     pattern: '\\bmyapp_svc_[A-Za-z0-9]{32}\\b'
+#
+# severity:                      # raise or lower a rule for this project
+#   vc-open-redirect: low
+#
+# ignore_paths:                  # every ignore needs a reason; ignored findings stay in the report
 #   - path: 'scripts/**'
 #     reason: One-off scripts I run by hand. Never deployed.
 #
@@ -181,6 +192,26 @@ if not os.path.exists(p(".vibecheck.yml")) and \
 #     reason: Single-use download token that expires in 5 minutes.
 #     until: 2027-06-30                 # optional: the finding comes back after this date
 """)
+
+# 2b. Starter project rule ----------------------------------------------------------------------
+starter_dir = p(".vibecheck", "rules")
+if not os.path.exists(starter_dir) and ask(
+        "rules", "Create .vibecheck/rules/ with a starter rule (every API route must check who's calling)?", False):
+    src = os.path.join(SCANNER, "examples", "custom-rules", "rules")
+    for here, _dirs, files in os.walk(src):
+        for name in files:
+            rel = os.path.relpath(os.path.join(here, name), src)
+            with open(os.path.join(here, name)) as fh:
+                text = fh.read()
+            if "myapp-admin-client" in text:      # only the require-auth starter and its tests
+                continue
+            write(os.path.join(starter_dir, rel), text)
+    cfg_path = p(".vibecheck.yml")
+    cfg_text = read(cfg_path) or ""
+    if not re.search(r"^rules:", cfg_text, re.M):
+        write(cfg_path, "rules:\n  - .vibecheck/rules/\n\n" + cfg_text)
+    print("  Edit .vibecheck/rules/require-auth.yaml to use your auth helper's name, then test it:\n"
+          f"  {VC} test-rules .vibecheck/rules .vibecheck/rules/tests")
 
 # 3. Claude Code ------------------------------------------------------------------------------
 if ask("claude", "Claude Code: add the /vibecheck skill (.claude/skills) and a short rule in CLAUDE.md?", True):

@@ -239,6 +239,11 @@ rules:
       - pattern: $REQ.params
       - pattern: $REQ.body
       - pattern: $URL.searchParams.get(...)
+      - patterns:
+          - pattern: $SP.get(...)
+          - metavariable-regex:
+              metavariable: $SP
+              regex: ^(searchParams|params|query|qs|urlParams)$
       - pattern: (await $REQ.json())
       - pattern: (await $REQ.formData()).get(...)
     pattern-sanitizers:
@@ -280,6 +285,11 @@ rules:
       - pattern: $REQ.params
       - pattern: $REQ.body
       - pattern: $URL.searchParams.get(...)
+      - patterns:
+          - pattern: $SP.get(...)
+          - metavariable-regex:
+              metavariable: $SP
+              regex: ^(searchParams|params|query|qs|urlParams)$
       - pattern: (await $REQ.json())
     pattern-sinks:
       - patterns:
@@ -315,6 +325,11 @@ rules:
       - pattern: $REQ.params
       - pattern: $REQ.body
       - pattern: $URL.searchParams.get(...)
+      - patterns:
+          - pattern: $SP.get(...)
+          - metavariable-regex:
+              metavariable: $SP
+              regex: ^(searchParams|params|query|qs|urlParams)$
     pattern-sinks:
       - patterns:
           - pattern-either:

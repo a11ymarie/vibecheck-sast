@@ -1,0 +1,32 @@
+rules:
+  - id: myapp-logs-request-body
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      A whole request body is written to the logs. Bodies carry passwords, tokens and personal
+      data, and logs are kept longer and read by more people (and tools) than the database.
+    metadata:
+      title: Request body written to logs
+      level: medium
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      confirm: >-
+        Check which route this is: login, signup, payment and profile routes almost always carry
+        sensitive fields.
+      impact: >-
+        High: auth or payment routes. Medium: other user input. False positive: a route whose
+        body is known to hold nothing sensitive.
+      fix: >-
+        Log only the fields you need (e.g. the record id), or use the logger's redaction option.
+    patterns:
+      - pattern-either:
+          - pattern: console.$LOG(..., $REQ.body, ...)
+          - pattern: logger.$LOG(..., $REQ.body, ...)
+          - pattern: console.$LOG(..., await $REQ.json(), ...)
+          - pattern: logger.$LOG(..., await $REQ.json(), ...)
+          - patterns:
+              - pattern-inside: |
+                  $BODY = await $REQ.json();
+                  ...
+              - pattern-either:
+                  - pattern: console.$LOG(..., $BODY, ...)
+                  - pattern: logger.$LOG(..., $BODY, ...)

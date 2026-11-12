@@ -82,7 +82,10 @@ def write(path: str, *, app_name: str, scanned_at: str, quick: bool, findings: l
               f"`{f.where()}` · rule `{f.rule}` · id `{f.id}`"
               + (f" · {f.cwe}" if f.cwe else "")
               + (f" · also flagged by {', '.join(s for s in f.found_by if s != f.source)}"
-                 if len(f.found_by) > 1 else ""), ""]
+                 if len(f.found_by) > 1 else "")
+              + (" · project rule" if f.extra.get("project_rule") else "")
+              + (f" · severity set in .vibecheck.yml (was {f.extra['severity_was']})"
+                 if f.extra.get("severity_was") else ""), ""]
         if f.snippet:
             L += ["```", f.snippet, "```", ""]
         if f.message:

@@ -23,6 +23,9 @@ jobs:
       - name: Rule tests
         run: semgrep --test --config rules/vibecheck-rules.yaml rules/tests/vibecheck-rules.tsx
 
+      - name: Example project rules
+        run: ./vibecheck test-rules examples/custom-rules/rules examples/custom-rules/rules/tests
+
       - name: Unit tests
         run: python3 -m unittest discover -v tests
 

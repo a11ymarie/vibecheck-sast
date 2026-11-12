@@ -1,0 +1,29 @@
+# Example project settings. To use them, copy this file and the rules/ folder into your app's
+# root (most people put rules in .vibecheck/rules/ and point `rules:` there), then edit.
+# Every key is optional. Full guide: docs/customizing.md
+
+# Your own Semgrep rules: files or folders, relative to this file.
+rules:
+  - rules/
+
+# Your own secret formats (Python regular expressions). Matches are masked in reports.
+secrets:
+  - id: myapp-service-token
+    title: MyApp internal service token
+    pattern: '\bmyapp_svc_[A-Za-z0-9]{32}\b'
+    severity: high
+
+# Raise or lower a rule's severity for this project.
+severity:
+  vc-token-in-localstorage: high      # any token in localStorage counts as high for us
+  vc-open-redirect: low               # all redirects go through our allow-listed router
+
+# Semgrep's community rules (on by default in full scans). Set to false to run only the
+# vibecheck rules plus your own.
+community: true
+
+# Hide specific findings, always with a reason. Ignored findings stay listed in the report.
+ignore_findings:
+  - rule: myapp-route-without-auth
+    paths: ['app/api/health/route.ts']
+    reason: "Uptime check for our monitor; returns only {ok: true}."

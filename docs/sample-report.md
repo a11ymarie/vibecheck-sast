@@ -1,6 +1,6 @@
 # Security report: demo-app
 
-*2026-11-11 17:32:53 · full scan · vibecheck-sast*
+*2026-11-12 00:46:14 · full scan · vibecheck-sast*
 
 | 🔴 Critical | 🟠 High | 🟡 Medium | ⚪ Low |
 | --- | --- | --- | --- |

@@ -32,7 +32,7 @@ OWN_PREFIX = "vc-"
 
 SKIP_DIRS = ["node_modules", ".git", ".next", ".nuxt", ".output", ".vercel", ".turbo",
              ".svelte-kit", ".expo", "build", "dist", "out", "coverage", "storybook-static",
-             "ios", "android", "vendor", "vibecheck-report"]
+             "ios", "android", "vendor", "vibecheck-report", ".vibecheck"]
 SKIP_FILES = ["*.min.js", "*.bundle.js", "*.map", "*.test.*", "*.spec.*", "__tests__", "__mocks__"]
 
 SEMGREP_SEVERITY = {"ERROR": "high", "WARNING": "medium", "INFO": "low"}
@@ -116,10 +116,32 @@ def fetch_community(log=print) -> int:
                     + "). Check your connection, or use --quick, which doesn't need them.")
 
 
-def _load_own_rules() -> dict:
+def _rule_files(path: str):
+    if os.path.isdir(path):
+        for here, _dirs, files in os.walk(path):
+            for name in sorted(files):
+                # Skip test targets that sit next to rules (e.g. my-rule.test.yaml is fine to skip).
+                if name.endswith((".yaml", ".yml")) and ".test." not in name:
+                    yield os.path.join(here, name)
+    else:
+        yield path
+
+
+def _load_rules(paths) -> dict:
+    """Rule id -> rule, for vibecheck's own rules and any project rules."""
     import yaml
-    with open(OWN_RULES) as fh:
-        return {r["id"]: r for r in yaml.safe_load(fh)["rules"]}
+    out = {}
+    for path in paths:
+        for f in _rule_files(path):
+            try:
+                with open(f) as fh:
+                    doc = yaml.safe_load(fh) or {}
+            except (OSError, yaml.YAMLError) as e:
+                raise ScanError(f"couldn't read rule file {f}: {e}")
+            for r in doc.get("rules", []) if isinstance(doc, dict) else []:
+                if isinstance(r, dict) and r.get("id"):
+                    out[r["id"]] = r
+    return out
 
 
 def _read_lines(app, path, start, end):
@@ -131,7 +153,7 @@ def _read_lines(app, path, start, end):
         return ""
 
 
-def run(app: str, raw_dir: str, community: bool) -> tuple[list[Finding], list[str]]:
+def run(app: str, raw_dir: str, community: bool, project_rules=()) -> tuple[list[Finding], list[str]]:
     """Scan `app`. Returns findings and notes about files Semgrep couldn't fully read.
 
     Raises ScanError if Semgrep fails: a scan that didn't run must never look like a clean one.
@@ -143,6 +165,8 @@ def run(app: str, raw_dir: str, community: bool) -> tuple[list[Finding], list[st
            "--timeout", "10", "--max-target-bytes", "2000000", "--config", OWN_RULES]
     if community:
         cmd += ["--config", COMMUNITY_DIR]
+    for path in project_rules:
+        cmd += ["--config", path]
     for pat in SKIP_DIRS + SKIP_FILES:
         cmd += ["--exclude", pat]
     cmd.append(".")
@@ -152,14 +176,17 @@ def run(app: str, raw_dir: str, community: bool) -> tuple[list[Finding], list[st
         fh.write(proc.stderr)
     # Semgrep exits 0 when the scan completed (findings or not); anything else is a failure.
     if proc.returncode != 0:
-        raise ScanError(f"Semgrep failed (exit {proc.returncode}); see {raw_dir}/semgrep.log")
+        hint = (" If you just added or changed a project rule, check it with: semgrep --test "
+                "--config <rule file> <test file>") if project_rules else ""
+        raise ScanError(f"Semgrep failed (exit {proc.returncode}); see {raw_dir}/semgrep.log.{hint}")
     try:
         with open(out) as fh:
             data = json.load(fh)
     except (OSError, ValueError):
         raise ScanError(f"Semgrep produced no readable results; see {raw_dir}/semgrep.log")
 
-    own = _load_own_rules()
+    own = _load_rules([OWN_RULES])
+    mine = _load_rules(project_rules)
     findings = []
     for r in data.get("results", []):
         rule = r["check_id"].rsplit(".", 1)[-1]
@@ -176,6 +203,18 @@ def run(app: str, raw_dir: str, community: bool) -> tuple[list[Finding], list[st
                 path=path, line=start, snippet=first_line, message=extra.get("message", "").strip(),
                 confirm=m.get("confirm", ""), impact=m.get("impact", ""), fix=m.get("fix", ""),
                 cwe=m.get("cwe", ""), kind=m.get("kind", "code"), match_text=code))
+        elif rule in mine:
+            # A project rule: use its metadata if it has vibecheck's fields, sensible defaults if not.
+            m = mine[rule].get("metadata", {}) or {}
+            level = m.get("level") or SEMGREP_SEVERITY.get(mine[rule].get("severity", "WARNING"), "medium")
+            cwe = m.get("cwe", "")
+            cwe = cwe[0] if isinstance(cwe, list) and cwe else cwe
+            findings.append(Finding(
+                source="custom", rule=rule, severity=level,
+                title=m.get("title") or rule.replace("-", " ").replace("_", " ").capitalize(),
+                path=path, line=start, snippet=first_line, message=extra.get("message", "").strip(),
+                confirm=m.get("confirm", ""), impact=m.get("impact", ""), fix=m.get("fix", ""),
+                cwe=cwe, kind=m.get("kind", "code"), extra={"project_rule": True}, match_text=code))
         else:
             cls = guidance.for_cwe(meta.get("cwe"))
             cwe = meta.get("cwe")

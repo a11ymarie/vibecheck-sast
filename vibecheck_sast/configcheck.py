@@ -20,7 +20,7 @@ from .model import Finding
 
 SKIP_DIRS = {"node_modules", ".git", "build", "dist", "out", "coverage", "storybook-static",
              ".expo", "ios", "android", ".next", ".nuxt", ".output", ".vercel", ".turbo",
-             ".svelte-kit", ".cache", "vendor", "vibecheck-report"}
+             ".svelte-kit", ".cache", "vendor", "vibecheck-report", ".vibecheck"}
 TEXT_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".vue", ".svelte", ".astro", ".json",
             ".yml", ".yaml", ".toml", ".md", ".sql", ".rules", ".html", ".sh", ".txt", ""}
 MAX_BYTES = 1_500_000

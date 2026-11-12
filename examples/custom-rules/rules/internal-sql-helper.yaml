@@ -1,0 +1,37 @@
+rules:
+  - id: myapp-input-reaches-run-report
+    languages: [typescript, javascript]
+    # Taint mode: follow values from a "source" (request input) to a "sink" (our helper's SQL
+    # argument), through variables and string building, unless a "sanitizer" is applied.
+    mode: taint
+    severity: ERROR
+    message: >-
+      Request input reaches the SQL text passed to runReport(), our reporting helper, which runs
+      the string as-is. Someone can change the query.
+    metadata:
+      title: Request input in a runReport() query
+      level: high
+      cwe: "CWE-89: SQL Injection"
+      confirm: >-
+        Trace the value from the request to the runReport() call; on a local copy, send a value
+        with a single quote and see whether the report query breaks.
+      impact: >-
+        High whenever request input reaches the SQL text. False positive: the value went through
+        allowColumn() or another allow-list first.
+      fix: >-
+        Pass values in runReport's params argument, and pick column names from allowColumn().
+    pattern-sources:
+      - pattern: $REQ.query
+      - pattern: $REQ.body
+      - pattern: $URL.searchParams.get(...)
+      - patterns:
+          - pattern: $SP.get(...)
+          - metavariable-regex:
+              metavariable: $SP
+              regex: ^(searchParams|params|query|qs|urlParams)$
+    pattern-sanitizers:
+      - pattern: allowColumn(...)
+    pattern-sinks:
+      - patterns:
+          - pattern: runReport($SQL, ...)
+          - focus-metavariable: $SQL

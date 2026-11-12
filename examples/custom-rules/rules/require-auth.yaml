@@ -1,0 +1,41 @@
+rules:
+  - id: myapp-route-without-auth
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      This API route handler never calls requireUser(), so anyone on the internet can call it
+      without logging in. In this project every API route must check who's calling, except the
+      ones under app/api/public/ and app/api/webhooks/.
+    # Only look at Next.js route handlers, and skip the routes that are public on purpose.
+    paths:
+      include:
+        - "app/api/**/route.ts"
+        - "app/api/**/route.js"
+      exclude:
+        - "app/api/public/**"
+        - "app/api/webhooks/**"
+    metadata:
+      title: API route doesn't check who's calling
+      level: high
+      cwe: "CWE-862: Missing Authorization"
+      confirm: >-
+        Call the route without being logged in (curl, or a private browser window). If it returns
+        data or changes something instead of a 401, it's real.
+      impact: >-
+        High: the route returns or changes user data. False positive: the route is meant to be
+        public; move it under app/api/public/ or add an ignore entry with the reason.
+      fix: >-
+        Start the handler with const user = await requireUser(req), and use user.id to limit
+        what it reads or changes.
+    patterns:
+      - pattern: |
+          export async function $METHOD(...) { ... }
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(GET|POST|PUT|PATCH|DELETE)$
+      - pattern-not: |
+          export async function $METHOD(...) {
+            ...
+            <... requireUser(...) ...>;
+            ...
+          }

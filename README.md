@@ -131,7 +131,7 @@ it added:
 | **Before each commit** | A git pre-commit hook (local to your machine) | exposed keys and critical findings |
 | **On push and pull requests** | A GitHub Action | high and critical |
 | **Before deploy** | `npm run security` and `npm run security:quick` | high and critical |
-| **Housekeeping** | `.env` files and reports added to `.gitignore`; an empty `.vibecheck.yml` | — |
+| **Housekeeping** | `.env` files and reports added to `.gitignore`; a commented `.vibecheck.yml`; optionally a starter project rule | — |
 
 Files that get committed find the scanner by a relative path (like `../vibecheck-sast`), so no
 personal paths end up in your repo; set `VIBECHECK_HOME` where it lives somewhere else. On a
@@ -143,6 +143,7 @@ public Actions logs are readable by anyone.
 ```
 ./vibecheck [options] <path-to-app>
 ./vibecheck init [--yes | --all | --dry-run] [--only STEPS] <path-to-app>
+./vibecheck test-rules <rules file or folder> <tests folder>
 ```
 
 | Option | What it does |
@@ -174,6 +175,31 @@ ignore_findings:
     reason: Single-use download token that expires in 5 minutes.
     until: 2027-06-30                 # optional: the finding comes back after this date
 ```
+
+## Make it yours
+
+Out of the box it's a general scanner. To fit it to your project, without forking:
+
+- **Settings** in `.vibecheck.yml`: your own secret formats (e.g. your company's token prefix),
+  raise or lower any rule's severity, turn community rules off, ignore findings with a reason.
+- **Your own Semgrep rules**, kept in your app (`.vibecheck/rules/`) and run in the same scan, with
+  the same report, fix tasks and `--compare`. For example: "every API route must call
+  `requireUser()`", which no general scanner can know.
+- **`vibecheck test-rules`** to test them against example files before trusting them.
+
+```yaml
+rules: [.vibecheck/rules/]
+secrets:
+  - id: myapp-service-token
+    pattern: '\bmyapp_svc_[A-Za-z0-9]{32}\b'
+severity:
+  vc-open-redirect: low
+```
+
+**[docs/customizing.md](docs/customizing.md)** walks through it: the settings, writing and
+testing rules (with four tested recipes in [`examples/custom-rules/`](examples/custom-rules)),
+sharing rules across projects, having your AI assistant write one, and forking to change the
+defaults.
 
 ## What it can't tell you
 
@@ -229,7 +255,8 @@ vibecheck_sast/
   configcheck.py               .env files, Supabase migrations, Firebase rules, public env names
   deps.py                      npm audit
   model.py                     the Finding record, ids, merging
-  ignores.py                   .vibecheck.yml
+  project.py / ignores.py      .vibecheck.yml settings and ignores
+  ruletest.py                  vibecheck test-rules
   compare.py                   --compare
   report.py / tasks.py         report.md / fix-tasks.md
   guidance.py                  guidance for community-rule hits, by vulnerability class
@@ -238,6 +265,7 @@ rules/vibecheck-rules.yaml     the 18 vibecheck rules
 rules/tests/                   semgrep --test cases for every rule
 integrations/                  the /vibecheck workflow and the GitHub Action that init installs
 examples/demo-app/             deliberately insecure demo app
+examples/custom-rules/         example project rules, tests and settings (see docs/customizing.md)
 tests/                         unit and end-to-end tests
 demo.sh                        demo scan; --playground makes a practice copy
 docs/                          samples, AI-assistant guide, example fix run
@@ -247,6 +275,7 @@ docs/                          samples, AI-assistant guide, example fix run
 
 ```bash
 semgrep --test --config rules/vibecheck-rules.yaml rules/tests/vibecheck-rules.tsx
+./vibecheck test-rules examples/custom-rules/rules examples/custom-rules/rules/tests
 python3 -m unittest discover tests
 ./demo.sh
 ```
