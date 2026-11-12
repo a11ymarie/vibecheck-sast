@@ -1,0 +1,69 @@
+name: vibecheck
+
+# Security scan on every push to main and every pull request (added by `vibecheck init`).
+# Fails the check when anything high or critical is found; change --fail-on to adjust.
+#
+# On a PUBLIC repo, the job summary and logs show only counts, and the full report isn't
+# uploaded: Actions logs and artifacts of public repos are visible to anyone, and the report
+# describes weaknesses in your app. On a private repo you get the full summary and the report
+# as a downloadable artifact.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out this app
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: app
+
+      # If vibecheck-sast is a private repo, this checkout also needs a `token:` with read access
+      # to it (e.g. a fine-grained personal access token stored as a repository secret).
+      - name: Check out vibecheck-sast
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          repository: {{SCANNER_REPO}}
+          ref: main # pin to a tag or commit SHA so results only change when you choose
+          path: vibecheck-sast
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - run: pip install -r vibecheck-sast/requirements.txt
+
+      - name: Scan
+        env:
+          COUNTS_ONLY: ${{ github.event.repository.private && '' || '--counts-only' }}
+        run: vibecheck-sast/vibecheck --fail-on high $COUNTS_ONLY --out "$RUNNER_TEMP/vibecheck" app
+
+      - name: Job summary
+        if: always()
+        env:
+          PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          r="$RUNNER_TEMP/vibecheck/report.md"
+          [ -f "$r" ] || exit 0
+          if [ "$PRIVATE" = "true" ]; then
+            # Everything up to the detailed findings: summary table and "Fix these first".
+            awk '/^## (🔴|🟠|🟡|⚪|Ignored|---)/{exit} {print}' "$r" >> "$GITHUB_STEP_SUMMARY"
+          else
+            awk '/^## Summary/{on=1} on&&/^\|/{print} on&&/^$/&&n++{exit}' "$r" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report (private repos only)
+        if: always() && github.event.repository.private
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: vibecheck-report
+          path: ${{ runner.temp }}/vibecheck
+          retention-days: 14

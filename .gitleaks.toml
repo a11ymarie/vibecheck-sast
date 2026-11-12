@@ -1,0 +1,10 @@
+# The demo app contains one deliberately planted, made-up secret so the secret detectors have
+# something to find (demo.sh generates the rest at run time and never commits them). This
+# allowlist matches only that exact value; gitleaks still reports anything else.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Planted fake credential in examples/demo-app"
+regexTarget = "match"
+regexes = ['''Zt7wQm2Lx9Vb4Np8Rk3Hs6Jd''']

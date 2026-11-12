@@ -1,0 +1,4 @@
+semgrep==1.175.0
+pyyaml==6.0.2
+# Older semgrep releases import pkg_resources, which setuptools 81 removed.
+setuptools<81

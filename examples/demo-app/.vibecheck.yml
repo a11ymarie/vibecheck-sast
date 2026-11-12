@@ -1,0 +1,10 @@
+# Example ignore file: vibecheck reads .vibecheck.yml from the root of the app it scans.
+# Every entry needs a reason, and ignored findings are still listed in the report.
+ignore_findings:
+  - rule: vc-secret-in-url
+    paths: ['server/worker.js']
+    reason: >-
+      Example of a scoped ignore: pretend the export link uses a single-use download token that
+      expires in five minutes, not a session token. Only this file is ignored; the rule still
+      runs everywhere else.
+    until: 2027-06-30

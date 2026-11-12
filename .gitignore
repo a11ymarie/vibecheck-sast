@@ -1,0 +1,19 @@
+# Reports describe weaknesses in the scanned app: never commit them.
+vibecheck-report/
+demo-output/
+
+# Downloaded at first run (Semgrep Rules License), never committed.
+rules/community/
+rules/community.partial/
+
+# Local environment
+.env
+.env.*
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/

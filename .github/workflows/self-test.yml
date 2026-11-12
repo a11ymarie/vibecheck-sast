@@ -1,0 +1,56 @@
+name: Self-test
+
+# Every push and pull request: rule tests, unit tests, then a full scan of the demo app that must
+# find what was planted there without leaking any of the planted keys into its output.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+
+      - name: Rule tests
+        run: semgrep --test --config rules/vibecheck-rules.yaml rules/tests/vibecheck-rules.tsx
+
+      - name: Unit tests
+        run: python3 -m unittest discover -v tests
+
+      - name: Demo scan
+        run: ./demo.sh
+
+      - name: Demo finds what was planted, and masks the keys
+        run: |
+          for rule in supabase-service-role-key firebase-rules-open env-file-not-gitignored \
+                      supabase-table-without-rls vc-ai-key-in-browser vc-sql-from-strings \
+                      vc-server-fetches-user-url vc-path-from-request vc-mass-assignment \
+                      vc-shell-command-from-input vc-dynamic-code vc-secret-fallback; do
+            jq -e --arg r "$rule" '[.findings[] | select(.rule == $r)] | length > 0' \
+              demo-output/findings.json > /dev/null || { echo "not found: $rule"; exit 1; }
+          done
+          jq -e '.ignored | length == 1' demo-output/findings.json > /dev/null
+          grep -qF 'Needs a person' demo-output/fix-tasks.md
+          ! grep -rqE 'Hq4Vn8Tz2Ly6Rc9Wm3Kp7Bd5Gx1Sf0Ja|Zt7wQm2Lx9Vb4Np8Rk3Hs6Jd' \
+              demo-output/report.md demo-output/fix-tasks.md demo-output/findings.json
+
+      - name: Quick scan of a clean folder passes the strictest gate
+        run: |
+          mkdir -p "$RUNNER_TEMP/clean app"
+          echo "export const add = (a, b) => a + b" > "$RUNNER_TEMP/clean app/index.js"
+          ./vibecheck --quick --fail-on low "$RUNNER_TEMP/clean app"
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: demo-output
+          path: demo-output
