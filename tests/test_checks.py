@@ -146,5 +146,16 @@ class ConfigChecks(unittest.TestCase):
         ])
 
 
+
+class CommunityDownloadPaths(unittest.TestCase):
+    def test_archive_paths_are_never_trusted(self):
+        from vibecheck_sast.semgrep import _wanted
+        self.assertTrue(_wanted("javascript/express/security/rule.yaml"))
+        for bad in ("javascript/../../etc/security/x.yaml", "/javascript/security/x.yaml",
+                    "javascript//security/x.yaml", "javascript\\..\\security\\x.yaml",
+                    "javascript/security/x.test.yaml", "python/security/x.yaml"):
+            self.assertFalse(_wanted(bad), bad)
+
+
 if __name__ == "__main__":
     unittest.main()

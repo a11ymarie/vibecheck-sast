@@ -81,6 +81,9 @@ def _from_git():
 
 def _wanted(rel: str) -> bool:
     parts = rel.split("/")
+    # Never trust paths from a downloaded archive: no absolute paths, no "..", no empty parts.
+    if rel.startswith("/") or "\\" in rel or any(p in ("", ".", "..") for p in parts):
+        return False
     name = parts[-1]
     return (len(parts) > 2 and parts[0] in COMMUNITY_LANGS and "security" in parts
             and name.endswith((".yaml", ".yml")) and ".test." not in name and ".fixed." not in name)
@@ -98,7 +101,9 @@ def fetch_community(log=print) -> int:
             for rel, data in source():
                 if not (_wanted(rel) or rel == "LICENSE"):
                     continue
-                dest = os.path.join(tmp, rel)
+                dest = os.path.realpath(os.path.join(tmp, rel))
+                if not dest.startswith(os.path.realpath(tmp) + os.sep):
+                    continue
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with open(dest, "wb") as out:
                     out.write(data)

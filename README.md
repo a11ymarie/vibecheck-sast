@@ -287,6 +287,11 @@ ids start with `vc-`.
 The demo app contains one planted, made-up secret, and `demo.sh` generates more at run time
 without committing them. `.gitleaks.toml` allowlists exactly the committed one.
 
+## Security
+
+Found a problem in vibecheck itself? Please report it privately; see [SECURITY.md](SECURITY.md).
+The code in `examples/` and `rules/tests/` is deliberately insecure, so it isn't in scope.
+
 ## License
 
 MIT (see [LICENSE](LICENSE)). Semgrep's community rules aren't included: they're downloaded at

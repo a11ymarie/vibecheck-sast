@@ -1,0 +1,50 @@
+name: CodeQL
+
+# GitHub's code scanning for vibecheck-sast's own code: the Python scanner and these workflows.
+#
+# This is "advanced setup" on purpose. GitHub's one-click default setup can't skip folders, and
+# this repo deliberately contains vulnerable code (examples/ and the rule test files) for the
+# scanner to find, which would bury real alerts. Don't also turn on default setup in Settings:
+# the two can't run together.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 9 * * 1' # weekly, so new CodeQL queries run even when nothing changed
+  workflow_dispatch: {}   # run it by hand: gh workflow run codeql.yml
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write # upload results to the Security tab
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, actions]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-and-quality
+          config: |
+            paths-ignore:
+              - examples        # deliberately insecure demo app and example rule tests
+              - rules/tests     # deliberately insecure test cases for the scanner's rules
+              - tests           # unit tests build fake keys and vulnerable snippets on purpose
+
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
