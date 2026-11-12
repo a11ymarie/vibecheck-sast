@@ -8,6 +8,8 @@ explains each finding in plain language, and says how to confirm it and how to f
 ./vibecheck ~/code/my-app
 ```
 
+![vibecheck scanning an app, then re-checking after three fixes: 3 fixed, 0 new](docs/demo/demo.gif)
+
 Hand the results to your AI coding assistant (in Claude Code, type `/vibecheck`), then re-run
 it to see what's fixed, what's still open, and what's new. Run it while you build, before each
 commit, on every pull request and before you deploy: `./vibecheck init` sets that up.
@@ -268,7 +270,7 @@ examples/demo-app/             deliberately insecure demo app
 examples/custom-rules/         example project rules, tests and settings (see docs/customizing.md)
 tests/                         unit and end-to-end tests
 demo.sh                        demo scan; --playground makes a practice copy
-docs/                          samples, AI-assistant guide, example fix run
+docs/                          samples, guides, example fix run; docs/demo/ re-records the GIF
 ```
 
 ## Development

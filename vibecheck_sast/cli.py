@@ -28,6 +28,12 @@ REPORTS = os.path.join(ROOT, "vibecheck-report")
 ICON = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "⚪"}
 
 
+def tilde(path: str) -> str:
+    """Show paths under the home folder as ~/... in terminal output."""
+    home = os.path.expanduser("~")
+    return "~" + path[len(home):] if home not in ("", "/") and path.startswith(home + os.sep) else path
+
+
 def fail(msg: str):
     print(f"vibecheck: {msg}", file=sys.stderr)
     sys.exit(2)
@@ -120,7 +126,7 @@ def main(argv=None):
             fail(f"no such file to compare with: {a.compare}")
 
 
-    print(f"vibecheck: scanning {app}" + (" (quick)" if a.quick else ""))
+    print(f"vibecheck: scanning {tilde(app)}" + (" (quick)" if a.quick else ""))
     found = []
     try:
         if community and not semgrep.community_ready():
@@ -202,8 +208,8 @@ def main(argv=None):
                 print(f"  … {len(urgent) - 8} more in the report")
         for n in notes:
             print(f"  ⚠️  {n}")
-    print(f"Report:    {os.path.join(out, 'report.md')}")
-    print(f"Fix tasks: {os.path.join(out, 'fix-tasks.md')}")
+    print(f"Report:    {tilde(os.path.join(out, 'report.md'))}")
+    print(f"Fix tasks: {tilde(os.path.join(out, 'fix-tasks.md'))}")
 
     if a.fail_on:
         if a.fail_on == "secrets":
